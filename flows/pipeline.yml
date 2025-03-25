@@ -1,0 +1,134 @@
+id: imdb_pipeline
+namespace: zoomcamp
+
+description: |
+  Data Set utilizado: https://developer.imdb.com/non-commercial-datasets/
+
+inputs:
+  - id: file_name
+    type: SELECT
+    displayName: Selecione o arquivo do dataset a ser baixado
+    values: [ratings, basics, episode]
+    defaults: ratings
+
+variables:
+
+  # montando o nome dos arquivos
+  tsv_file: "title.{{inputs.file_name}}.tsv"
+  parquet_file: "title.{{inputs.file_name}}.parquet"
+
+  # montando o nome dos arquivos de output
+  tsv_data: "{{outputs.download_files.outputFiles['title.' ~ inputs.file_name ~ '.tsv']}}"
+  parquet_data: "{{outputs.tsv_to_parquet.outputFiles['title.' ~ inputs.file_name ~ '.parquet']}}"
+
+  # caminho do parquet no data lake (bucket)
+  gcs_file_parquet: "gs://{{kv('gcp_bucket_name')}}/{{vars.parquet_file}}" 
+
+  # nome da tabela do BigQuery
+  table: "{{kv('gcp_dataset')}}.raw_{{inputs.file_name}}"
+
+# dados para acessar o GCP
+pluginDefaults:
+  - type: io.kestra.plugin.gcp
+    values:
+      serviceAccount: "{{kv('gcp_credentials')}}" # GUI
+      projectId: "{{kv('gcp_project_id')}}" # arquivo gcp_kv
+      location: "{{kv('gcp_location')}}" # arquivo gcp_kv
+      bucket: "{{kv('gcp_bucket_name')}}" # arquivo gcp_kv
+      dataset: "{{kv('gcp_dataset')}}" # arquivo gcp_kv
+
+tasks:
+
+  - id: download_files
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: Baixa e salva o arquivo .tsv já descompactado, através de comando de CLI.
+    outputFiles:
+      - "*.tsv"
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - wget -qO- https://datasets.imdbws.com/{{render(vars.tsv_file)}}.gz | gunzip > {{render(vars.tsv_file)}}
+
+  - id: tsv_to_parquet
+    type: io.kestra.plugin.scripts.python.Script
+    description: Converte os arquivos .tsv em parquet para economizar espaço no data lake.
+    beforeCommands:
+      - pip install pandas fastparquet
+    outputFiles:
+      - "*.parquet"
+    script: |
+      import pandas as pd
+
+      # Obtendo o caminho do arquivo baixado
+      tsv_data = "{{render(vars.tsv_data)}}"
+
+      # Carregando o arquivo TSV
+      df = pd.read_csv(tsv_data, sep="\t", low_memory=False)
+
+      # Salvando como Parquet
+      df.to_parquet('{{render(vars.parquet_file)}}', index = False, engine = "fastparquet")
+    
+  - id: ingest_parquet_on_data_lake
+    type: io.kestra.plugin.gcp.gcs.Upload
+    description: Carrega os arquivos parquet no data lake (bucket do GCS).
+    from: "{{render(vars.parquet_data)}}"
+    to: "{{render(vars.gcs_file_parquet)}}"
+  
+  - id: if_ratings
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{inputs.file_name == 'ratings'}}"
+    description: |
+        Executa um subflow dedicado ao arquivo 'ratings', que contém as notas dadas pelos usuários aos filmes/séries.
+        Essa tabela não precisa ser particionada / clusterizada, pois seu tamanho é pouco mais de 30 MB.
+    then:
+      - id: subflow_ratings_pipeline
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: ratings_pipeline
+        namespace: zoomcamp
+        inputs:
+          table: "{{render(vars.table)}}"
+          gcs_file_parquet: "{{render(vars.gcs_file_parquet)}}"
+          parquet_file: "{{render(vars.parquet_file)}}"
+        wait: true # a pipeline principal irá esperar a execução do subflow finalizar para prosseguir
+        transmitFailed: true # o pipeline principal irá falhar caso a execução do subflow falhe
+    
+  - id: if_basics
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{inputs.file_name == 'basics'}}"
+    description: |
+        Executa um subflow dedicado ao arquivo 'basics', que contém informações gerais dos filmes/séries tais como nome, ano de lançamento, etc.
+        Essa tabela foi apenas clusterizada na coluna 'titleType', pensando em uma possibilidade dessa tabela crescer muito. Mas ainda assim, em um cenário real, são poucos registros para  justificar a aplicação de particionamento / clusterização.
+    then:
+      - id: subflow_basics_pipeline
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: basics_pipeline
+        namespace: zoomcamp
+        inputs:
+          table: "{{render(vars.table)}}"
+          gcs_file_parquet: "{{render(vars.gcs_file_parquet)}}"
+          parquet_file: "{{render(vars.parquet_file)}}"
+        wait: true
+        transmitFailed: true
+  
+  - id: if_episode
+    type: io.kestra.plugin.core.flow.If
+    condition: "{{inputs.file_name == 'episode'}}"
+    description: |
+        Executa um subflow dedicado ao arquivo 'episode', que contém informações sobre o número do episódio e da temporada, em caso de séries.
+        Não há particionamento ou clusterização pois não são muitos dados.
+    then:
+      - id: subflow_episode_pipeline
+        type: io.kestra.plugin.core.flow.Subflow
+        flowId: episode_pipeline
+        namespace: zoomcamp
+        inputs:
+          table: "{{render(vars.table)}}"
+          gcs_file_parquet: "{{render(vars.gcs_file_parquet)}}"
+          parquet_file: "{{render(vars.parquet_file)}}"
+        wait: true
+        transmitFailed: true
+    
+  - id: delete_generated_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: Exclui os arquivos produzidos pela pipeline.
+    disabled: false
