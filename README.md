@@ -44,15 +44,23 @@ No Kestra é possível criar pipelines tanto através de código-fonte em YAML c
 
 Este arquivo contém pares chave-valor com informações sobre a autenticação do acesso ao GCP. Quando o mesmo é executado no Kestra, os valores passam a fazer parte do storage interno do kestra (em PostgreSQL) e passam a estar disponíveis para todas as pipelines do namespace. Namespace é uma organização lógica para cada projeto. 
 
+![KV](imgs/kv.png)
+
 **2. Arquivo pipeline.yml**
 
 Este arquivo contém o fluxo principal da pipeline. Através da execução dele é possível fornecer os parâmetros da execução, fazer o download dos arquivos para o storage do Kestra, converter para Parquet, ingerir os arquivos convertidos no Data Lake (GCS) e decidir qual dos 3 subfluxos serão utilizados.
 
-Visão No-Code e Topológica da pipeline:
+Visão No-Code e Topológica do Fluxo Principal:
 ![Fluxo Principal](imgs/pipeline_imdb.png)
 
 **3. Arquivo subflow_basics.yml**
 
+![Fluxo arquivo basics](imgs/basics.png)
+
 **4. Arquivo subflow_ratings.yml**
 
+![Fluxo arquivo ratings](imgs/ratings.png)
+
 **5. Arquivo subflow_episode.yml**
+
+![Fluxo arquivo episodes](imgs/episodes.png)
