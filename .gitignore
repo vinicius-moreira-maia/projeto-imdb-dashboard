@@ -1,7 +1,0 @@
-keys
-*.json
-.terraform
-*.hcl
-*.info
-*.tfstate
-*.backup
