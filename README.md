@@ -1,12 +1,27 @@
 # Pipeline de Extração, Transformação e Carga de dados do IMDb (Internet Movie Database)
 
+## 📚 Índice
+
+- [Arquitetura](#arquitetura)
+- [Descrição](#descrição)
+- [Ferramentas Utilizadas](#ferramentas-utilizadas)
+- [Sobre o Projeto](#sobre-o-projeto)
+  - [1. Arquivo kv.yml](#1-arquivo-kvyml)
+  - [2. Arquivo pipeline.yml](#2-arquivo-pipelineyml)
+    - [Tasks](#tasks)
+  - [3. Arquivo subflow_basics.yml](#3-arquivo-subflow_basicsyml)
+    - [Tasks](#tasks-1)
+  - [4. Arquivo subflow_ratings.yml](#4-arquivo-subflow_ratingsyml)
+  - [5. Arquivo subflow_episode.yml](#5-arquivo-subflow_episodeyml)
+- [Alguns pontos de melhoria](#alguns-pontos-de-melhoria)
+
 ## Arquitetura
 
 ![Kestra Pipeline](imgs/pipeline.png)
 
 ## Descrição
 
-Este projeto teve como intuito a **implementação de uma pipeline de dados** que **extrai arquivos TSV** (Tab-Separated Values) da fonte, **processa os dados** e faz a **ingestão dos mesmos no BigQuery** (Google Cloud). O dataset utilizado foi o disponibilizado gratuitamente pelo [IMDb Non-Commercial Datasets](https://developer.imdb.com/non-commercial-datasets/), que contém tanto informações gerais sobre filmes e séries, entre outros, como informações sobre as avaliações dos usuários.  
+Este projeto implementa uma **pipeline de dados orquestrada no Kestra**, com o objetivo de **extrair**, **transformar** e **carregar** dados do [IMDb Non-Commercial Datasets](https://developer.imdb.com/non-commercial-datasets/) no **BigQuery**, utilizando o **Google Cloud como infraestrutura**. Os dados são inicialmente **baixados em formato TSV**, **convertidos para Parquet**, **armazenados em um Data Lake (GCS)**, **transformados via SQL** e **carregados em tabelas gerenciadas do BigQuery**.
 
 **Tarefas da pipeline**:
 
@@ -71,7 +86,7 @@ Visão No-Code e Topológica do Fluxo Principal:
 
 **tsv_to_parquet**
 
-CSV's, e por consequência TSV's, não possuem metadados inerentes, potanto trata-se apenas de arquivos de texto. Ler com o pandas antes e depois converter para o parquet garante que a inferência de tipos do pandas seja utilizada e que os tipos de dados façam parte dos metadados do parquet.  
+CSV's, e por consequência TSV's, não possuem metadados inerentes, portanto trata-se apenas de arquivos de texto. Ler com o pandas antes e depois converter para o parquet garante que a inferência de tipos do pandas seja utilizada e que os tipos de dados façam parte dos metadados do parquet.  
 
 ```yaml
 - id: tsv_to_parquet
@@ -132,11 +147,11 @@ Condição para caso o input seja 'ratings', que é o nome de um arquivo baixado
 
 **if_basics**
 
-O mesmo que if_ratings, basicamente.
+Idêntico à task if_ratings, com algumas adaptações.
 
 **if_episode**
 
-O mesmo que if_ratings, basicamente.
+Idêntico à task if_ratings, com algumas adaptações.
 
 **delete_generated_files**
 
@@ -218,7 +233,7 @@ Criando uma tabela com base no arquivo parquet presente no data lake.
 
 **bq_basics_tmp**
 
-Essa **tabela temporária funciona como uma tabela de staging**. **Aqui é calculado o dentificador único do registro com base em várias colunas**. O valor do **hash** é conseguido com a função MD5.
+Essa **tabela temporária funciona como uma tabela de staging**. **Aqui é calculado o identificador único do registro com base em várias colunas**. O valor do **hash** é conseguido com a função MD5.
 
 ```yaml
 - id: bq_basics_table_tmp
@@ -304,24 +319,32 @@ Por fim, a tabela temporária e a tabela externa são excluídas.
 
 ### **4. Arquivo subflow_ratings.yml**
 
-O mesmo que subflow_basics, basicamente.
+Idêntico ao arquivo subflow_basics, com algumas adaptações.
 
 Visão no e low code da pipeline.
 ![Fluxo arquivo ratings](imgs/ratings.png)
 
 ### **5. Arquivo subflow_episode.yml**
 
-O mesmo que subflow_basics, basicamente.
+Idêntico ao arquivo subflow_basics, com algumas adaptações.
 
 Visão no e low code da pipeline.
 ![Fluxo arquivo episodes](imgs/episodes.png)
 
 ## Alguns pontos de melhoria:
 
-**1.** Modelar as tabelas finais em um formato estrela ou snowflake.
+**1. Modelagem Dimensional** 
 
-**2.** Fazer o tratamento de campos nulos ou ausentes.
+Organizar as tabelas finais no formato estrela ou snowflake, facilitando análises OLAP.
 
-**3.** Diminuir a redundância de código nos arquivos que definem as pipelines.
+**2. Tratamento de Dados** 
 
-**4.** Implementar um dashboard para exibir algumas métricas interessantes.
+Implementar regras para lidar com campos nulos ou valores ausentes, melhorando a qualidade dos dados.
+
+**3. Redução de redundância** 
+
+Modularizar trechos repetidos entre os subflows para facilitar manutenção e reutilização de código.
+
+**4. Visualização de Dados** 
+
+Desenvolver dashboard para acompanhar métricas como número de filmes por ano, gêneros mais comuns, notas médias etc.
