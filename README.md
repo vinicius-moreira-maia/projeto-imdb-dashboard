@@ -6,9 +6,9 @@
 
 ## Descrição
 
-Este projeto teve como intuito a **implementação de uma pipeline de dados** que **extrai arquivos TSV** (Tab-Separated Values) da fonte, **processa os dados** e faz a **ingestão dos mesmos no BigQuery** (Google Cloud); O dataset utilizado foi o disponibilizado gratuitamente pelo [IMDb Non-Commercial Datasets](https://developer.imdb.com/non-commercial-datasets/), que contém tanto informações gerais sobre filmes e séries, entre outros, como informações sobre as avaliações dos usuários.  
+Este projeto teve como intuito a **implementação de uma pipeline de dados** que **extrai arquivos TSV** (Tab-Separated Values) da fonte, **processa os dados** e faz a **ingestão dos mesmos no BigQuery** (Google Cloud). O dataset utilizado foi o disponibilizado gratuitamente pelo [IMDb Non-Commercial Datasets](https://developer.imdb.com/non-commercial-datasets/), que contém tanto informações gerais sobre filmes e séries, entre outros, como informações sobre as avaliações dos usuários.  
 
-Tarefas da pipeline:
+**Tarefas da pipeline**:
 
 **1.** Download dos arquivos em TSV
 
@@ -34,21 +34,19 @@ Tarefas da pipeline:
 
 **6. BigQuery** - Para servir como um Data Warehouse
 
-Importante salientar que as tabelas finais importadas no BigQuery não estão modeladas para servir de data warehouse/data mart, estas tabelas podem ser consideradas como uma "camada raw" para a criação de fatos e dimensões. Também seria possível utilizar uma abordagem de "schema on read" (ELT) para fazer análises sobre os dados.
-
 ## Sobre o Projeto
 
-No Kestra é possível criar pipelines tanto através de código-fonte em YAML como a através de No-Code / Low-Code. Para esta pipeline foram definidos 5 arquivos .yml, que estão na pasta 'flows'.
+No Kestra é possível criar pipelines tanto através de código-fonte em YAML como através de No-Code / Low-Code. Para esta pipeline **foram definidos 5 arquivos .yml, que estão na pasta 'flows'**.
 
 ### **1. Arquivo kv.yml**
 
-Este arquivo contém pares chave-valor com informações sobre a autenticação do acesso ao GCP. Quando o mesmo é executado, os valores passam a fazer parte do storage interno do Kestra (em PostgreSQL) e passam a estar disponíveis para todas as pipelines do namespace. Namespace é uma organização lógica para cada projeto e pode conter várias pipelines. 
+Este arquivo contém **pares chave-valor com informações sobre a autenticação do acesso ao GCP**. Quando o mesmo é executado, os valores passam a fazer parte do storage interno do Kestra (em PostgreSQL) e passam a estar disponíveis para todas as pipelines do namespace. **Namespace** é uma organização lógica para cada projeto e pode conter várias pipelines. 
 
 ![KV](imgs/kv.png)
 
 ### **2. Arquivo pipeline.yml**
 
-Este arquivo contém o fluxo principal da pipeline. Através da execução dele é possível fornecer os parâmetros da execução, fazer o download dos arquivos para o storage do Kestra, converter para Parquet, ingerir os arquivos convertidos no Data Lake (GCS) e decidir qual dos 3 subfluxos serão utilizados.
+Este arquivo contém o fluxo principal da pipeline. Através da execução dele é possível **fornecer os parâmetros da execução**, **fazer o download dos arquivos** para o storage do Kestra, **converter para Parquet**, **ingerir os arquivos convertidos no Data Lake** (GCS) e **decidir qual dos 3 subfluxos serão executados**.
 
 Visão No-Code e Topológica do Fluxo Principal:
 ![Fluxo Principal](imgs/pipeline_imdb.png)
@@ -57,10 +55,10 @@ Visão No-Code e Topológica do Fluxo Principal:
 
 **download_files**
 
-'tsv_file' é uma variável que foi definida tendo como base o valor de input fornecido ao executar a pipeline. A função 'render' é necessária para que o valor seja corretamente construído com base nos inputs.
+**'tsv_file'** é uma variável que foi definida tendo como base o valor de input fornecido ao executar a pipeline. A função 'render' é necessária para que o valor seja corretamente construído com base nos inputs.
 
 ```yaml
-  - id: download_files
+- id: download_files
     type: io.kestra.plugin.scripts.shell.Commands
     description: Baixa e salva o arquivo .tsv já descompactado, através de comando de CLI.
     outputFiles:
@@ -73,10 +71,10 @@ Visão No-Code e Topológica do Fluxo Principal:
 
 **tsv_to_parquet**
 
-CSV's, e por consequência TSV's, não possuem metadados inerentes, potanto trata-se apenas de arquivos de texto. Ler com o pandas antes e depois converter para o parquet, garante que a inferência de tipos do pandas seja utilizada e que os tipos de dados façam parte dos metadados do parquet.  
+CSV's, e por consequência TSV's, não possuem metadados inerentes, potanto trata-se apenas de arquivos de texto. Ler com o pandas antes e depois converter para o parquet garante que a inferência de tipos do pandas seja utilizada e que os tipos de dados façam parte dos metadados do parquet.  
 
 ```yaml
-    - id: tsv_to_parquet
+- id: tsv_to_parquet
     type: io.kestra.plugin.scripts.python.Script
     description: Converte os arquivos .tsv em parquet para economizar espaço no data lake.
     beforeCommands:
@@ -101,7 +99,7 @@ CSV's, e por consequência TSV's, não possuem metadados inerentes, potanto trat
 Com as credenciais configuradas, basta apontar para o endereço do bucket.
 
 ```yaml
-  - id: ingest_parquet_on_data_lake
+- id: ingest_parquet_on_data_lake
     type: io.kestra.plugin.gcp.gcs.Upload
     description: Carrega os arquivos parquet no data lake (bucket do GCS).
     from: "{{render(vars.parquet_data)}}"
@@ -153,7 +151,7 @@ Depois que os dados são carregados no data lake, não se faz necessário mantê
 
 ### **3. Arquivo subflow_basics.yml**
 
-Os 3 subflows seguem praticamente a mesma estrutura, portanto o aprofundamento será feito apenas neste subflow.
+**Os 3 subflows seguem praticamente a mesma estrutura**, portanto o aprofundamento será feito apenas neste.
 
 Visão no e low code da pipeline.
 ![Fluxo arquivo basics](imgs/basics.png)
@@ -162,12 +160,12 @@ Visão no e low code da pipeline.
 
 **bq_basics_table**
 
-Criação da tabela definitiva. A clusterização foi feita para otimizar consultas que façam agrupamentos utilizando a coluna titleType.
+Criação da tabela definitiva. **A clusterização foi feita para otimizar consultas que façam agrupamentos utilizando a coluna titleType**.
 
-As colunas filename e unique_row_id não são originais do dataset, a primeira foi criada apenas para guardar o nome do arquivo de origem, a segunda foi para servir de identificador único de um registro.
+As colunas **filename** e **unique_row_id** não são originais do dataset, a primeira foi criada apenas para guardar o nome do arquivo de origem, a segunda foi para servir de identificador único de um registro.
 
 ```yaml
-        - id: bq_basics_table
+    - id: bq_basics_table
         type: io.kestra.plugin.gcp.bigquery.Query
         description: Cria a tabela principal no BigQuery.
         sql: |
@@ -194,7 +192,7 @@ As colunas filename e unique_row_id não são originais do dataset, a primeira f
 Criando uma tabela com base no arquivo parquet presente no data lake.
 
 ```yaml
-      - id: bq_basics_table_external
+    - id: bq_basics_table_external
         type: io.kestra.plugin.gcp.bigquery.Query
         description: Cria a tabela externa com os dados do parquet do data lake.
         sql: |
@@ -220,7 +218,7 @@ Criando uma tabela com base no arquivo parquet presente no data lake.
 
 **bq_basics_tmp**
 
-Essa tabela temporária funciona como uma tabela de staging. Aqui é calculado o identificador único do registro com base em várias colunas. O valor do hash é conseguido com a função MD5.
+Essa **tabela temporária funciona como uma tabela de staging**. **Aqui é calculado o dentificador único do registro com base em várias colunas**. O valor do **hash** é conseguido com a função MD5.
 
 ```yaml
 - id: bq_basics_table_tmp
@@ -251,7 +249,7 @@ Essa tabela temporária funciona como uma tabela de staging. Aqui é calculado o
 
 **bq_basics_merge**
 
-Aqui é feito um merge entre a tabela definitiva e a tabela temporária utilizando o hash de ambas como chave. Funções hash sempre devolvem a mesma chave se os mesmos inputs forem fornecidos, portanto se o registro da tabela temporária já estiver na tabela final, ele será desconsiderado.
+Aqui é feito um **merge entre a tabela definitiva e a tabela temporária utilizando o hash de ambas como chave**. Funções hash sempre devolvem a mesma chave se os mesmos inputs forem fornecidos, portanto se um registro da tabela temporária já estiver na tabela final, ele será desconsiderado.
 
 ```yaml
       - id: bq_basics_table_merge
@@ -317,3 +315,13 @@ O mesmo que subflow_basics, basicamente.
 
 Visão no e low code da pipeline.
 ![Fluxo arquivo episodes](imgs/episodes.png)
+
+## Alguns pontos de melhoria:
+
+**1.** Modelar as tabelas finais em um formato estrela ou snowflake.
+
+**2.** Fazer o tratamento de campos nulos ou ausentes.
+
+**3.** Diminuir a redundância de código nos arquivos que definem as pipelines.
+
+**4.** Implementar um dashboard para exibir algumas métricas interessantes.
